@@ -21,7 +21,7 @@ export default function UsersPage() {
     if (res.ok) {
       const data = await res.json();
       setUsers(data);
-      const depts = [...new Set(data.map((u: any) => u.department).filter(Boolean))] as string[];
+      const depts = Array.from(new Set(data.map((u: any) => u.department).filter(Boolean))) as string[];
       setDepartments(depts.sort());
     }
   }, [selectedDept, activeOnly]);
