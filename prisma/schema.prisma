@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum SignatureType {
+  HEADER
+  FOOTER
+  BOTH
+}
+
+enum DeploymentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
+  ROLLED_BACK
+}
+
+enum DeploymentUserStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
+  ROLLED_BACK
+}
+
+model Admin {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  role      AdminRole @default(EDITOR)
+  avatarUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  deployments Deployment[]
+
+  @@map("admins")
+}
+
+model Template {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  type        SignatureType  @default(FOOTER)
+  htmlContent String        @db.Text
+  isDefault   Boolean       @default(false)
+  isActive    Boolean       @default(true)
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  assignments UserTemplateAssignment[]
+  deployments Deployment[]
+
+  @@map("templates")
+}
+
+model WorkspaceUser {
+  id             String   @id @default(cuid())
+  googleId       String   @unique
+  email          String   @unique
+  firstName      String?
+  lastName       String?
+  fullName       String?
+  department     String?
+  jobTitle       String?
+  phone          String?
+  avatarUrl      String?
+  isActive       Boolean  @default(true)
+  lastSyncedAt   DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignments    UserTemplateAssignment[]
+  deploymentUsers DeploymentUser[]
+
+  @@map("workspace_users")
+}
+
+model UserTemplateAssignment {
+  id         String   @id @default(cuid())
+  userId     String
+  templateId String
+  createdAt  DateTime @default(now())
+
+  user     WorkspaceUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template Template      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, templateId])
+  @@map("user_template_assignments")
+}
+
+model Deployment {
+  id          String           @id @default(cuid())
+  templateId  String
+  deployedBy  String
+  status      DeploymentStatus @default(PENDING)
+  totalUsers  Int              @default(0)
+  successCount Int             @default(0)
+  failCount   Int              @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  rollbackOf  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  template Template         @relation(fields: [templateId], references: [id])
+  admin    Admin            @relation(fields: [deployedBy], references: [id])
+  users    DeploymentUser[]
+
+  @@map("deployments")
+}
+
+model DeploymentUser {
+  id           String               @id @default(cuid())
+  deploymentId String
+  userId       String
+  status       DeploymentUserStatus @default(PENDING)
+  errorMessage String?
+  previousSignature String?         @db.Text
+  newSignature      String?         @db.Text
+  processedAt       DateTime?
+  createdAt         DateTime        @default(now())
+
+  deployment Deployment    @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  user       WorkspaceUser @relation(fields: [userId], references: [id])
+
+  @@unique([deploymentId, userId])
+  @@map("deployment_users")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  bannerHtml  String   @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("campaigns")
+}
+
+model AppSettings {
+  id                    String  @id @default(cuid())
+  companyName           String  @default("Develeap")
+  companyDomain         String  @default("develeap.com")
+  defaultSignatureType  SignatureType @default(FOOTER)
+  googleServiceAccountEmail String?
+  googleAdminEmail      String?
+  deploymentConcurrency Int     @default(5)
+
+  @@map("app_settings")
+}
